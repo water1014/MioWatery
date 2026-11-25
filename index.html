@@ -1862,7 +1862,7 @@ button.feed-follow-plus{padding:0;cursor:pointer}
 .of-bar{overflow-x:auto;scrollbar-width:none}.of-bar::-webkit-scrollbar{display:none}
 .of-bar button{flex:none;white-space:nowrap;padding:6px 12px}
 </style>
-<style id="fix61-dcw-off">#v-home #home-page2 .dcw-off,#v-home #home-page3 .dcw-off,#v-home #home-page4 .dcw-off,#v-home .dcw-off{display:none!important}</style>
+<style id="fix61-dcw-off">#v-home #home-page2 .dcw-off,#v-home #home-page3 .dcw-off,#v-home #home-page4 .dcw-off,#v-home .dcw-off{display:none!important}/* 这三个组件的布局规则选择器更具体（带 #id + !important），要用更高优先级才压得住 */#v-home #home-page2 #desktop-quote-widget.dcw-off,#v-home #home-page3 #p3-calendar.dcw-off,#v-home #home-page4 #p4-music.dcw-off,#v-home #home-page2 #recent-search-widget.dcw-off,#v-home .wrap>#tw.dcw-off,#v-home .wrap>#memo-image-card.dcw-off,#v-home .wrap>.recent-glass.dcw-off{display:none!important}</style>
 <style id="p3-hide-imessage-leave-blank">
 /* 第三页：移除 iMessage 卡片，日历和四个横排 App 保留，下面留白 */
 #home-page3 .page3-layout{
@@ -4483,7 +4483,7 @@ function dcIos(){
   sW.append(mk('div','dci-h','添加'),grp(...adds));
   if(hasW){sW.append(mk('div','dci-h','已添加'),grp(list))}else{sW.append(mk('div','dci-f','还没有自定义小组件。'));}
   try{sW.append(...dcGlassUI())}catch(e){console.error(e)}
-  const sMore=mk('section','dci-s');sMore.dataset.dcs='more';
+  const sMore=mk('section','dci-s');sMore.dataset.dcs='more';try{sMore.append(...dctPackUI())}catch(e){console.error(e)}
   if(intro){intro.className='dci-f';sMore.append(mk('div','dci-h','说明'),intro)}
   reset.className='dci-row dci-red';reset.innerHTML='<span class="l">重置所有桌面美化</span>';
   sMore.append(grp(reset));
@@ -10213,7 +10213,7 @@ function dcwGrip(h){const g=document.createElement('button');g.type='button';g.c
 (function(){const c=document.createElement('style');c.id='fix80-dcw-grip';c.textContent='.dcw-grip{position:absolute;top:5px;right:5px;z-index:5;width:28px;height:20px;padding:0;border:0;border-radius:10px;background:rgba(120,120,128,.2);color:#555;font-size:15px;line-height:20px;opacity:.5;-webkit-tap-highlight-color:transparent;touch-action:manipulation}.dcw-grip:active{opacity:.9}';document.head.appendChild(c)})();
 function dcwApply(){
  const d=dcwD();
- DCW_BUILT.forEach(b=>{const el=$(b.s);if(el)el.classList.toggle('dcw-off',d.hidden.includes(b.k))});
+ DCW_BUILT.forEach(b=>{const el=$(b.s);if(!el)return;const off=d.hidden.includes(b.k);el.classList.toggle('dcw-off',off);if(off){el.style.setProperty('display','none','important');el.dataset.dcwHid='1'}else if(el.dataset.dcwHid){el.style.removeProperty('display');delete el.dataset.dcwHid}});
  document.querySelectorAll('.dcw[data-dcw]').forEach(e=>e.remove());
  for(let i=DCW_FR.length-1;i>=0;i--)if(!DCW_FR[i].preview||!DCW_FR[i].host.isConnected)DCW_FR.splice(i,1);
  d.widgets.filter(w=>w.kind==='css').forEach(w=>{const L=d.wlib.find(x=>x.id===w.lib);if(!L)return;const pg=w.page||2,z=dcwZone(pg);if(!z)return;
@@ -10345,6 +10345,82 @@ function dcwAugment(sW){
  nodes.push(mk('div','dci-h','桌面原有组件'),grp(...DCW_BUILT.map(b=>row(b.n+' · 第'+b.p+'屏',d.hidden.includes(b.k)?'已移除':'显示中',()=>{if(d.hidden.includes(b.k))d.hidden=d.hidden.filter(x=>x!==b.k);else d.hidden.push(b.k);save();dcwApply();renderDesktopCustomizer()}))),mk('div','dci-f','点一下可移除或找回；也可以在桌面长按组件、长按空白处来操作。'));
  sW.prepend(...nodes);
 }
+/* ===== 桌面美化包：导出 / 导入 ===== */
+function dctClean(o){
+ const R={wallpaper:'',icons:{},widgets:[],order:{},wlib:[],hidden:[],free:{}};
+ if(!o||typeof o!=='object')return R;
+ const OK=k=>typeof k==='string'&&/^[\w:.\-]{1,80}$/.test(k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype';
+ const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';
+ const num=(v,a,b,d)=>{v=+v;return isFinite(v)?Math.max(a,Math.min(b,v)):d};
+ const col=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v)?v:'';
+ const img=v=>{v=typeof v==='string'?v.trim():'';if(!v)return'';if(/^data:image\/(png|jpe?g|gif|webp|avif);base64,[A-Za-z0-9+\/=]+$/i.test(v))return v.length<=12e6?v:'';if(/^https:\/\/[^\s"'()<>\\]{1,2000}$/i.test(v))return v;return''};
+ R.wallpaper=img(o.wallpaper);
+ if(o.icons&&typeof o.icons==='object')Object.keys(o.icons).slice(0,80).forEach(k=>{const s=img(o.icons[k]);if(OK(k)&&s)R.icons[k]=s});
+ const idm={},used=new Set();
+ (Array.isArray(o.wlib)?o.wlib:[]).slice(0,60).forEach(x=>{if(!x||typeof x!=='object')return;
+  const html=str(x.html,80000),css=str(x.css,80000),js=str(x.js,80000);if(!html&&!css&&!js)return;
+  let id=OK(x.id)&&!used.has(x.id)?x.id:uid();used.add(id);idm[x.id]=id;
+  const wp=num(x.wp||(x.w==='half'?50:100),20,100,100);
+  R.wlib.push({id,name:str(x.name,40)||'未命名',html,css,js,h:num(x.h,50,900,120),wp,w:wp<75?'half':'full',perm:false})});
+ const wids=new Set();
+ (Array.isArray(o.widgets)?o.widgets:[]).slice(0,80).forEach(w=>{if(!w||typeof w!=='object')return;
+  const id=OK(w.id)&&!wids.has(w.id)?w.id:uid();
+  if(w.kind==='css'){const lib=idm[w.lib];if(!lib)return;wids.add(id);R.widgets.push({id,kind:'css',lib,page:Math.round(num(w.page,1,4,2)),title:str(w.title,60)})}
+  else if(w.kind==='text'){wids.add(id);R.widgets.push({id,kind:'text',title:str(w.title,60),text:str(w.text,2000)})}
+  else if(w.kind==='image'){const im=img(w.image);if(!im)return;wids.add(id);R.widgets.push({id,kind:'image',title:str(w.title,60),image:im})}
+  else if(w.kind==='clock'){wids.add(id);R.widgets.push({id,kind:'clock',title:str(w.title,60)||'时间',text:''})}});
+ R.hidden=[...new Set((Array.isArray(o.hidden)?o.hidden:[]).filter(k=>DCW_BUILT.some(b=>b.k===k)))];
+ if(o.order&&typeof o.order==='object')['first','second','dock','p3','p4'].forEach(k=>{if(Array.isArray(o.order[k]))R.order[k]=o.order[k].slice(0,100).map(v=>str(v,80))});
+ const safe=(v,d)=>{if(typeof v==='number')return isFinite(v)?v:undefined;if(typeof v==='boolean')return v;if(typeof v==='string')return v.slice(0,60);
+  if(v&&typeof v==='object'&&!Array.isArray(v)&&d<4){const r={};Object.keys(v).slice(0,200).forEach(k=>{if(!OK(k))return;const s=safe(v[k],d+1);if(s!==undefined)r[k]=s});return r}return undefined};
+ const fr=safe(o.free,0);if(fr&&typeof fr==='object')R.free=fr;
+ if(o.glass&&typeof o.glass==='object'){const g={on:{}},go=o.glass.on&&typeof o.glass.on==='object'?o.glass.on:{};
+  glassList().forEach(a=>{if(typeof go[a[0]]==='boolean')g.on[a[0]]=go[a[0]]});
+  if(o.glass.blur!=null)g.blur=num(o.glass.blur,0,40,16);if(o.glass.alpha!=null)g.alpha=num(o.glass.alpha,.05,.95,.45);
+  const gt=col(o.glass.text);if(gt)g.text=gt;R.glass=g}
+ ['musicWidgetCover','p3MusicCover','p4Cover','p3ChatAvatar'].forEach(k=>{const s=img(o[k]);if(s)R[k]=s});
+ ['qwLine1','qwLine2','p4Text','p3ChatTitle','p3ChatSubtitle'].forEach(k=>{const s=str(o[k],200);if(s)R[k]=s});
+ {const s=str(o.p3ChatAvatarEmoji,16);if(s)R.p3ChatAvatarEmoji=s}
+ if(Array.isArray(o.qwImgs)){const a=[0,1,2].map(i=>img(o.qwImgs[i]));if(a.some(Boolean))R.qwImgs=a}
+ if(Array.isArray(o.rsLines)){const a=o.rsLines.slice(0,12).map(v=>str(v,120));if(a.some(Boolean))R.rsLines=a}
+ ['textColor','timeColor','dateColor'].forEach(k=>{const c=col(o[k]);if(c)R[k]=c});
+ return R}
+function dctBuild(){return{app:'xsj-desktop-theme',v:1,created:new Date().toISOString().slice(0,10),desktop:dctClean(dcwD())}}
+function dctDownload(json,name){
+ const fn=name.replace(/[\\\/:*?"<>|]/g,'_')+'.json',f=new File([json],fn,{type:'application/json'});
+ if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:name}).catch(()=>{});
+ else{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},600)}}
+async function dctExport(){
+ const name=await askText('美化包名称','给这套桌面起个名字');if(name===null)return;
+ const nm=(name.trim()||'我的桌面').slice(0,40),pack=dctBuild();pack.name=nm;
+ const json=JSON.stringify(pack),kb=Math.max(1,Math.round(json.length/1024));
+ dcwSheet('导出「'+nm+'」 · '+(kb>=1024?(kb/1024).toFixed(1)+' MB':kb+' KB'),[
+  {label:'保存为文件',run:()=>dctDownload(json,nm)},
+  {label:'复制代码',run:()=>json.length>1500000?toast('内容太大，请用「保存为文件」'):dcwCopy(json)},
+  {label:'取消',cancel:1}])}
+function dctImportText(txt){
+ txt=String(txt||'').trim();
+ if(txt.length>8e7){toast('文件太大了');return false}
+ let o;try{o=JSON.parse(txt)}catch(e){toast('不是有效的美化包');return false}
+ if(o&&o.app==='xsj-widgets'){toast('这是组件包，请到「小组件」里用「导入组件」');return false}
+ if(!o||o.app!=='xsj-desktop-theme'||!o.desktop||typeof o.desktop!=='object'){toast('不是有效的美化包');return false}
+ const c=dctClean(o.desktop),nm=String(o.name||'').slice(0,40)||'未命名',nI=Object.keys(c.icons).length;
+ if(!confirm('导入美化包「'+nm+'」？\n\n壁纸：'+(c.wallpaper?'有':'无')+'　图标：'+nI+' 个　小组件：'+c.widgets.length+' 个　自定义组件：'+c.wlib.length+' 个\n\n会替换你现在的壁纸、图标、小组件、自定义组件和摆放位置，天气城市等个人设置不受影响。\n建议先「导出当前桌面美化」留个备份。\n\n美化包里的自定义组件带有代码，在沙盒里运行，只导入你信任的来源。'))return false;
+ const old=S.desktop||{},keep={};['wxData','wxCity','wxLat','wxLon'].forEach(k=>{if(old[k]!==undefined)keep[k]=old[k]});
+ S.desktop=Object.assign({},c,keep);
+ Promise.resolve(save()).then(ok=>{if(ok===false)return;toast('已导入，正在刷新…');setTimeout(()=>location.reload(),600)});
+ return true}
+function dctImportMenu(){
+ dcwSheet('导入美化包',[
+  {label:'选择文件',run:()=>{const i=document.createElement('input');i.type='file';i.accept='.json,application/json,text/plain';i.onchange=()=>{const f=i.files&&i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>dctImportText(r.result);r.readAsText(f)};i.click()}},
+  {label:'粘贴代码',run:()=>{dcwClose('dct-paste');const ov=document.createElement('div');ov.id='dct-paste';ov.className='dcw-ov ed';ov.innerHTML='<div class="dcw-sh full"><div class="gh"><button type="button" class="gx" data-k="x">取消</button><b>粘贴美化包代码</b><button type="button" class="gx pri" data-k="ok">导入</button></div><div class="gb"><textarea id="dct-pt" rows="14" spellcheck="false" placeholder="把导出的美化包代码粘贴到这里"></textarea></div></div>';document.body.appendChild(ov);ov.addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;if(b.dataset.k==='x')ov.remove();else{const v=ov.querySelector('#dct-pt').value;ov.remove();dctImportText(v)}})}},
+  {label:'取消',cancel:1}])}
+function dctPackUI(){
+ const mk=(t,c,h)=>{const e=document.createElement(t);e.className=c;if(h!=null)e.innerHTML=h;return e};
+ const row=(l,sub,fn)=>{const b=mk('button','dci-row','<span class="l">'+esc(l)+'</span><span class="r">'+esc(sub||'')+'</span><i class="ch">›</i>');b.type='button';b.onclick=fn;return b};
+ const g=mk('div','dci-g');g.appendChild(row('导出当前桌面美化','壁纸 · 图标 · 组件 · 摆放',dctExport));g.appendChild(row('导入美化包','文件或粘贴代码',dctImportMenu));
+ return[mk('div','dci-h','美化包'),g,mk('div','dci-f','把现在的壁纸、软件图标、小组件、自定义组件和摆放位置打包成一个文件，发给别人就能一键换上同样的桌面。导入会替换你当前的桌面美化。')]}
+
 /* --- 长按桌面空白处 / 不可拖动的组件 --- */
 (function(){
  const home=$('#v-home');if(!home||home.dataset.dcw)return;home.dataset.dcw=1;
